@@ -175,9 +175,13 @@ def production_summary():
 
 
 def scheduler_loop():
-    """Run ADMIN's safe current/future scheduler without legacy backfill."""
+    """Run ADMIN's safe scheduler and continuously repair legacy backfill."""
     while True:
         try:
+            # Keep the database clean even if an older ADMIN process or legacy
+            # scheduler has previously inserted historical open occurrences.
+            start = establish_operational_start()
+            remove_legacy_backfill(start)
             materialize_current_schedule()
         except Exception as exc:
             print("scheduler:", exc)
