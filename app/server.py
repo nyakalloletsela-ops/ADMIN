@@ -6,6 +6,8 @@ startup lifecycle concerns so a fresh installation starts its operational task
 schedule on the current day instead of manufacturing historical work.
 """
 import os
+import threading
+import time
 from datetime import date, timedelta
 import production as app
 
@@ -44,14 +46,7 @@ def establish_operational_start():
 
 
 def materialize_current_schedule():
-    """Materialize only today and future scheduled occurrences.
-
-    The legacy domain materializer backfilled four days before today. That is
-    useful for historical reporting but wrong for a newly installed operational
-    system: it creates overdue tasks before staff have ever used ADMIN. The
-    server therefore uses the same deterministic cadence rules without the
-    artificial historical window.
-    """
+    """Materialize only today and future scheduled occurrences."""
     c = app.db()
     today = date.today()
     templates = list(c.execute("SELECT * FROM task_templates WHERE active=1"))
@@ -106,11 +101,7 @@ def materialize_current_schedule():
 
 
 def remove_legacy_backfill(start):
-    """Remove only uncompleted task occurrences predating the start date.
-
-    This repairs databases created by the previous four-day backfill without
-    deleting completed/cancelled business history.
-    """
+    """Remove only uncompleted task occurrences predating the start date."""
     c = app.db()
     old_ids = [
         row[0]
@@ -183,6 +174,16 @@ def production_summary():
     return result
 
 
+def scheduler_loop():
+    """Run ADMIN's safe current/future scheduler without legacy backfill."""
+    while True:
+        try:
+            materialize_current_schedule()
+        except Exception as exc:
+            print("scheduler:", exc)
+        time.sleep(60)
+
+
 app._ORIGINAL_SUMMARY = app.summary
 app.summary = production_summary
 
@@ -193,7 +194,6 @@ if __name__ == "__main__":
     remove_legacy_backfill(start)
     materialize_current_schedule()
 
-    import threading
-    threading.Thread(target=app.worker, daemon=True).start()
+    threading.Thread(target=scheduler_loop, daemon=True).start()
     print(f"ADMIN production server on http://127.0.0.1:{app.PORT}")
     app.ThreadingHTTPServer((app.HOST, app.PORT), app.H).serve_forever()
