@@ -1,0 +1,32 @@
+name: ADMIN CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax check
+        run: python -m py_compile app/server.py
+      - name: Smoke start
+        env:
+          ADMIN_PASSWORD: ci-test-password
+          ADMIN_DB: /tmp/admin-ci.db
+        run: |
+          python app/server.py > /tmp/admin.log 2>&1 &
+          pid=$!
+          trap 'kill $pid' EXIT
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:8000/api/v1/health; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/admin.log
+          exit 1
