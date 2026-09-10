@@ -5,11 +5,11 @@ The production implementation lives in production.py so the executable entry
 point stays stable for local and deployment commands.
 """
 import os
-from datetime import date
+from datetime import date, timedelta
 import production as app
 
 # A newly installed ADMIN instance must not report scheduler backfill as if it
-# were historical business activity.  We persist the operational start date so
+# were historical business activity. We persist the operational start date so
 # overdue metrics become meaningful from the first real operating day onward.
 def establish_operational_start():
     c = app.db()
@@ -47,6 +47,7 @@ def production_summary():
     ).fetchone()
     start = start_row[0] if start_row else date.today().isoformat()
     today = date.today().isoformat()
+    seven_days_ago = max(start, (date.today() - timedelta(days=7)).isoformat())
 
     due_today = c.execute(
         """SELECT COUNT(*) FROM tasks
@@ -69,7 +70,7 @@ def production_summary():
     completed_7d = c.execute(
         """SELECT COUNT(*) FROM tasks
            WHERE status='COMPLETED' AND completed_at>=?""",
-        (start,),
+        (seven_days_ago,),
     ).fetchone()[0]
     upcoming = c.execute(
         """SELECT COUNT(*) FROM tasks
