@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
-"""ADMIN server entrypoint.
+"""ADMIN production server entrypoint.
 
-The production implementation lives in production.py so the executable entry
-point stays stable for local and deployment commands.
+The domain/API implementation remains in production.py. This entrypoint owns
+startup lifecycle concerns so a fresh installation starts its operational task
+schedule on the current day instead of manufacturing historical work.
 """
 import os
 from datetime import date, timedelta
 import production as app
 
-# A newly installed ADMIN instance must not report scheduler backfill as if it
-# were historical business activity. We persist the operational start date so
-# overdue metrics become meaningful from the first real operating day onward.
+
 def establish_operational_start():
+    """Persist the first real operating day for this ADMIN database."""
     c = app.db()
-    c.execute("CREATE TABLE IF NOT EXISTS admin_runtime_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+    c.execute(
+        "CREATE TABLE IF NOT EXISTS admin_runtime_meta "
+        "(key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+    )
     configured = os.getenv("ADMIN_OPERATION_START_DATE", "").strip()
     if configured:
         try:
@@ -21,6 +24,7 @@ def establish_operational_start():
         except ValueError as exc:
             c.close()
             raise SystemExit("ADMIN_OPERATION_START_DATE must be YYYY-MM-DD") from exc
+
     existing = c.execute(
         "SELECT value FROM admin_runtime_meta WHERE key='operational_start_date'"
     ).fetchone()
@@ -30,6 +34,7 @@ def establish_operational_start():
             "INSERT INTO admin_runtime_meta(key,value) VALUES('operational_start_date',?)",
             (start,),
         )
+
     c.commit()
     row = c.execute(
         "SELECT value FROM admin_runtime_meta WHERE key='operational_start_date'"
@@ -38,8 +43,97 @@ def establish_operational_start():
     return row[0]
 
 
+def materialize_current_schedule():
+    """Materialize only today and future scheduled occurrences.
+
+    The legacy domain materializer backfilled four days before today. That is
+    useful for historical reporting but wrong for a newly installed operational
+    system: it creates overdue tasks before staff have ever used ADMIN. The
+    server therefore uses the same deterministic cadence rules without the
+    artificial historical window.
+    """
+    c = app.db()
+    today = date.today()
+    templates = list(c.execute("SELECT * FROM task_templates WHERE active=1"))
+
+    for template in templates:
+        d = today
+        while d <= today + timedelta(days=14):
+            due = (
+                template["cadence"] == "daily"
+                or (template["cadence"] == "weekly" and d.weekday() == 0)
+                or (template["cadence"] == "monthly" and d.day == 1)
+                or (
+                    template["cadence"] == "quarterly"
+                    and d.day == 1
+                    and d.month in (1, 4, 7, 10)
+                )
+            )
+            if due:
+                c.execute(
+                    """INSERT OR IGNORE INTO tasks(
+                        template_id,title,area,responsible,priority,due_date,
+                        status,created_at,updated_at
+                    ) VALUES(?,?,?,?,?,?,?,?,?)""",
+                    (
+                        template["id"],
+                        template["title"],
+                        template["area"],
+                        template["responsible"],
+                        template["priority"],
+                        d.isoformat(),
+                        "PENDING",
+                        app.now(),
+                        app.now(),
+                    ),
+                )
+            d += timedelta(days=1)
+
+    today_s = today.isoformat()
+    for task in c.execute(
+        "SELECT id,title,due_date FROM tasks "
+        "WHERE status NOT IN ('COMPLETED','CANCELLED') AND due_date=?",
+        (today_s,),
+    ):
+        c.execute(
+            "INSERT OR IGNORE INTO reminders(task_id,kind,message,due_at) "
+            "VALUES(?,?,?,?)",
+            (task["id"], "due", "Due today: " + task["title"], app.now()),
+        )
+
+    c.commit()
+    c.close()
+
+
+def remove_legacy_backfill(start):
+    """Remove only uncompleted task occurrences predating the start date.
+
+    This repairs databases created by the previous four-day backfill without
+    deleting completed/cancelled business history.
+    """
+    c = app.db()
+    old_ids = [
+        row[0]
+        for row in c.execute(
+            "SELECT id FROM tasks WHERE due_date<? "
+            "AND status NOT IN ('COMPLETED','CANCELLED')",
+            (start,),
+        ).fetchall()
+    ]
+    if old_ids:
+        placeholders = ",".join("?" for _ in old_ids)
+        c.execute(
+            f"DELETE FROM reminders WHERE task_id IN ({placeholders})", old_ids
+        )
+        c.execute(
+            f"DELETE FROM tasks WHERE id IN ({placeholders})", old_ids
+        )
+    c.commit()
+    c.close()
+
+
 def production_summary():
-    """Return dashboard metrics without counting pre-operational backfill."""
+    """Return dashboard metrics for the actual operating window."""
     result = app._ORIGINAL_SUMMARY()
     c = app.db()
     start_row = c.execute(
@@ -79,26 +173,27 @@ def production_summary():
     ).fetchone()[0]
     c.close()
 
-    result['tasks'].update({
-        'due_today': due_today,
-        'overdue': overdue,
-        'open': open_tasks,
-        'completed_7d': completed_7d,
-        'scheduled_upcoming': upcoming,
+    result["tasks"].update({
+        "due_today": due_today,
+        "overdue": overdue,
+        "open": open_tasks,
+        "completed_7d": completed_7d,
+        "scheduled_upcoming": upcoming,
     })
     return result
 
 
-# Preserve the domain implementation and replace only the dashboard aggregation.
 app._ORIGINAL_SUMMARY = app.summary
 app.summary = production_summary
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.init()
-    establish_operational_start()
-    app.materialize()
+    start = establish_operational_start()
+    remove_legacy_backfill(start)
+    materialize_current_schedule()
+
     import threading
     threading.Thread(target=app.worker, daemon=True).start()
-    print(f'ADMIN production server on http://127.0.0.1:{app.PORT}')
+    print(f"ADMIN production server on http://127.0.0.1:{app.PORT}")
     app.ThreadingHTTPServer((app.HOST, app.PORT), app.H).serve_forever()
