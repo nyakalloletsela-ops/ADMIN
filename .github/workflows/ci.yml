@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Syntax check
-        run: python -m py_compile app/server.py
+        run: python -m py_compile app/server.py app/production.py
       - name: Smoke start
         env:
           ADMIN_PASSWORD: ci-test-password
@@ -25,8 +25,17 @@ jobs:
           pid=$!
           trap 'kill $pid' EXIT
           for i in $(seq 1 20); do
-            if curl -fsS http://127.0.0.1:8000/api/v1/health; then exit 0; fi
+            if curl -fsS http://127.0.0.1:8000/api/v1/health; then break; fi
             sleep 1
           done
+          curl -fsS -u admin:ci-test-password http://127.0.0.1:8000/api/v1/summary
+          curl -fsS -u admin:ci-test-password http://127.0.0.1:8000/api/v1/tasks
+          curl -fsS -u admin:ci-test-password http://127.0.0.1:8000/api/v1/properties
+          curl -fsS -u admin:ci-test-password http://127.0.0.1:8000/api/v1/tenants
+          curl -fsS -u admin:ci-test-password http://127.0.0.1:8000/api/v1/integrations
+          curl -fsS -u admin:ci-test-password -X POST -H 'Content-Type: application/json' \
+            -d '{"name":"CI Property"}' http://127.0.0.1:8000/api/v1/properties
+          curl -fsS -u admin:ci-test-password -X POST -H 'Content-Type: application/json' \
+            -d '{"title":"CI Task","due_date":"2026-09-10","area":"CI","responsible":"Administrative Officer","priority":"MEDIUM"}' \
+            http://127.0.0.1:8000/api/v1/tasks
           cat /tmp/admin.log
-          exit 1
