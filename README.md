@@ -1,47 +1,30 @@
-# ADMIN — Administrative Officer Management Platform (Farm & Property)
+# ADMIN — Automation of the Administrative Officer (Farm & Property Management)
 
-Architecture-first automation platform for the Administrative Officer's farm & property-management
-coordination work, derived from the two source documents:
+This repository holds the **architecture-first** design for automating the Administrative Officer's
+farm & property-management coordination work, derived from:
 
 - `Administrative_Officer_Farm_Property_Coordination_Workplan.pdf`
 - `Administrative_Officer_Job_Description-1.pdf`
 
-> **Status: architecture phase.** The authoritative spec is the **Master Build Prompt** (25 domains,
-> single system of record, the `PLAN → ASSIGN → EXECUTE → MONITOR → VERIFY → RECORD → REPORT →
-> FOLLOW UP` control cycle). No implementation code is written until this architecture is approved.
-> PR: [#1](https://github.com/nyakalloletsela-ops/ADMIN/pull/1).
+> **Status:** architecture phase — no implementation is committed until the architecture is approved.
+> The `app/` prototype is a throwaway feasibility spike, retained for reference only.
 
-## Architecture package
+## Documents
 
-| Deliverable (§78) | Document |
+| Path | What it is |
 | --- | --- |
-| 1 · Complete system architecture | [`docs/architecture.md`](docs/architecture.md) |
-| 2 · Domain map · 3 · Dependency graph | [`docs/domain-map.md`](docs/domain-map.md) |
-| 4 · Database ERD · 5 · Entity/data dictionary | [`docs/data-model.md`](docs/data-model.md) |
-| 6 · Role–permission matrix | [`docs/role-permission-matrix.md`](docs/role-permission-matrix.md) |
-| 7 · Workflow / state-machine definitions | [`docs/workflows.md`](docs/workflows.md) |
-| 8 · Event catalogue | [`docs/event-catalogue.md`](docs/event-catalogue.md) |
-| 9–11 · Task-template · Scheduler · Notification/Escalation | [`docs/automation-engines.md`](docs/automation-engines.md) |
-| 12 · API contract | [`docs/api-contract.md`](docs/api-contract.md) |
-| 13 · Navigation/IA · 14 · Dashboard spec | [`docs/information-architecture.md`](docs/information-architecture.md) |
-| 15 · Integration architecture | [`docs/integrations.md`](docs/integrations.md) |
-| 16 · Security · 17 · Audit architecture | [`docs/security-architecture.md`](docs/security-architecture.md) |
-| 18 · Offline / sync architecture | [`docs/offline-sync.md`](docs/offline-sync.md) |
-| 19 · Testing strategy | [`docs/testing-strategy.md`](docs/testing-strategy.md) |
-| 20 · Phased implementation plan | [`docs/implementation-plan.md`](docs/implementation-plan.md) |
-| — · Requirements & automation matrix | [`docs/activity-inventory.md`](docs/activity-inventory.md) |
-| — · PROVEN / INFERRED / DECISION_REQUIRED | [`docs/assumptions.md`](docs/assumptions.md) |
+| [`docs/architecture.md`](docs/architecture.md) | **The full architecture** (pre-code): context, requirements, principles, logical & deployment views, data model & dictionary, state machines, scheduling, notifications & escalation, reporting, integrations, security, ADRs, roadmap, costs, risks, KPIs and traceability. |
+| [`docs/activity-inventory.md`](docs/activity-inventory.md) | Requirements & automation matrix — every activity from both source PDFs classified by trigger → automation level → mechanism. |
 
 ## Reference spike (not part of the architecture phase)
 
 | Path | What it is |
 | --- | --- |
-| [`app/`](app/README.md) | Zero-dependency Python 3 feasibility spike (scheduler + task register). Throwaway — to be rebuilt per the approved architecture. |
+| [`app/`](app/README.md) | A zero-dependency Python 3 prototype demonstrating the PLAN → ASSIGN → EXECUTE → MONITOR → VERIFY → RECORD → REPORT → FOLLOW UP cycle. Superseded by the approved architecture; rebuilt properly during implementation phases. |
 
 ## How to read
 
-1. Start with [`docs/architecture.md`](docs/architecture.md) **§1–§8** (why & what).
-2. Review the package documents for the technical design (data, workflows, engines, security).
-3. Read [`docs/implementation-plan.md`](docs/implementation-plan.md) for the build order, and
-   [`docs/assumptions.md`](docs/assumptions.md) for the `DECISION_REQUIRED` items that gate specific
-   phases.
+1. Start with **§1–§8** of [`docs/architecture.md`](docs/architecture.md) for the "why and what".
+2. Review **§9–§19** for the technical design (views, data, workflows, security).
+3. Review **§20–§27** for decisions, roadmap, costs, risks, KPIs and the **open questions** that need
+   answers before implementation begins.
