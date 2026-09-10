@@ -45,6 +45,29 @@ def establish_operational_start():
     return row[0]
 
 
+def remove_legacy_backfill(start):
+    """Remove only uncompleted task occurrences predating the start date."""
+    c = app.db()
+    old_ids = [
+        row[0]
+        for row in c.execute(
+            "SELECT id FROM tasks WHERE due_date<? "
+            "AND status NOT IN ('COMPLETED','CANCELLED')",
+            (start,),
+        ).fetchall()
+    ]
+    if old_ids:
+        placeholders = ",".join("?" for _ in old_ids)
+        c.execute(
+            f"DELETE FROM reminders WHERE task_id IN ({placeholders})", old_ids
+        )
+        c.execute(
+            f"DELETE FROM tasks WHERE id IN ({placeholders})", old_ids
+        )
+    c.commit()
+    c.close()
+
+
 def materialize_current_schedule():
     """Materialize only today and future scheduled occurrences."""
     c = app.db()
@@ -100,37 +123,21 @@ def materialize_current_schedule():
     c.close()
 
 
-def remove_legacy_backfill(start):
-    """Remove only uncompleted task occurrences predating the start date."""
-    c = app.db()
-    old_ids = [
-        row[0]
-        for row in c.execute(
-            "SELECT id FROM tasks WHERE due_date<? "
-            "AND status NOT IN ('COMPLETED','CANCELLED')",
-            (start,),
-        ).fetchall()
-    ]
-    if old_ids:
-        placeholders = ",".join("?" for _ in old_ids)
-        c.execute(
-            f"DELETE FROM reminders WHERE task_id IN ({placeholders})", old_ids
-        )
-        c.execute(
-            f"DELETE FROM tasks WHERE id IN ({placeholders})", old_ids
-        )
-    c.commit()
-    c.close()
+def safe_materialize():
+    """Compatibility wrapper: every scheduler path is safe from backfill."""
+    start = establish_operational_start()
+    remove_legacy_backfill(start)
+    materialize_current_schedule()
 
 
 def production_summary():
     """Return dashboard metrics for the actual operating window."""
+    # Repair legacy rows before calculating the dashboard so the API cannot
+    # expose stale historical open work left by an older ADMIN process.
+    start = establish_operational_start()
+    remove_legacy_backfill(start)
     result = app._ORIGINAL_SUMMARY()
     c = app.db()
-    start_row = c.execute(
-        "SELECT value FROM admin_runtime_meta WHERE key='operational_start_date'"
-    ).fetchone()
-    start = start_row[0] if start_row else date.today().isoformat()
     today = date.today().isoformat()
     seven_days_ago = max(start, (date.today() - timedelta(days=7)).isoformat())
 
@@ -178,11 +185,7 @@ def scheduler_loop():
     """Run ADMIN's safe scheduler and continuously repair legacy backfill."""
     while True:
         try:
-            # Keep the database clean even if an older ADMIN process or legacy
-            # scheduler has previously inserted historical open occurrences.
-            start = establish_operational_start()
-            remove_legacy_backfill(start)
-            materialize_current_schedule()
+            safe_materialize()
         except Exception as exc:
             print("scheduler:", exc)
         time.sleep(60)
@@ -190,13 +193,14 @@ def scheduler_loop():
 
 app._ORIGINAL_SUMMARY = app.summary
 app.summary = production_summary
+# production.py's legacy worker resolves this module-level function at runtime.
+# Replacing it here makes even an accidental legacy worker invocation safe.
+app.materialize = safe_materialize
 
 
 if __name__ == "__main__":
     app.init()
-    start = establish_operational_start()
-    remove_legacy_backfill(start)
-    materialize_current_schedule()
+    safe_materialize()
 
     threading.Thread(target=scheduler_loop, daemon=True).start()
     print(f"ADMIN production server on http://127.0.0.1:{app.PORT}")
