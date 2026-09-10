@@ -46,8 +46,9 @@ Open `http://localhost:8000/` for the dashboard, or use the JSON API.
 
 ## Notes
 
-- This is a **reference implementation** for evaluation, not production. The architecture document
-  (`../docs/automation-architecture.md`) describes the production stack (Google Workspace → n8n →
-  custom) and the roadmap.
+- This is a **throwaway reference spike** for feasibility only — the project is architecture-first.
+  The authoritative full architecture is [`../docs/architecture.md`](../docs/architecture.md)
+  (production stack: Google Workspace → n8n → custom, plus the roadmap). Implementation proceeds only
+  after that architecture is approved.
 - Port is fixed at **8000**; bind is `0.0.0.0` so it works behind a preview proxy.
 - `admin.db` is git-ignored.

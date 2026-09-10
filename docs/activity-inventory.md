@@ -2,6 +2,7 @@
 
 > Source: `Administrative_Officer_Farm_Property_Coordination_Workplan.pdf` and
 > `Administrative_Officer_Job_Description-1.pdf`.
+> Companion document: [`architecture.md`](architecture.md) — the full architecture this matrix feeds.
 
 Every activity is classified against the three questions that determine *how* it should be
 automated:

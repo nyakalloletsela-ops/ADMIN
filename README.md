@@ -1,30 +1,30 @@
-# ADMIN — Automation Architecture for the Administrative Officer (Farm & Property Management)
+# ADMIN — Automation of the Administrative Officer (Farm & Property Management)
 
-This repository turns the Administrative Officer's paper workplan and job description into an
-**automation architecture**: a blueprint for automating the coordination, scheduling, tracking,
-reporting and follow-up of every key task — plus a runnable reference prototype.
-
-## What's inside
-
-| Path | What it is |
-| --- | --- |
-| [`docs/activity-inventory.md`](docs/activity-inventory.md) | Every activity from the workplan & job description, normalised into an automation matrix (frequency → trigger → automation level → mechanism). |
-| [`docs/automation-architecture.md`](docs/automation-architecture.md) | The full architecture: target system design, data model, scheduling & triggers, notifications/escalation, technology options, roadmap, KPIs and risks. |
-| [`app/`](app/README.md) | A zero-dependency Python reference prototype (scheduler + task register + dashboard + API) that demonstrates the **PLAN → ASSIGN → EXECUTE → MONITOR → VERIFY → RECORD → REPORT → FOLLOW UP** control cycle. |
-
-## Source documents
+This repository holds the **architecture-first** design for automating the Administrative Officer's
+farm & property-management coordination work, derived from:
 
 - `Administrative_Officer_Farm_Property_Coordination_Workplan.pdf`
 - `Administrative_Officer_Job_Description-1.pdf`
 
-## Quick start (prototype)
+> **Status:** architecture phase — no implementation is committed until the architecture is approved.
+> The `app/` prototype is a throwaway feasibility spike, retained for reference only.
 
-The prototype needs only Python 3 (no external packages):
+## Documents
 
-```bash
-cd app
-python3 server.py          # starts on http://0.0.0.0:8000
-```
+| Path | What it is |
+| --- | --- |
+| [`docs/architecture.md`](docs/architecture.md) | **The full architecture** (pre-code): context, requirements, principles, logical & deployment views, data model & dictionary, state machines, scheduling, notifications & escalation, reporting, integrations, security, ADRs, roadmap, costs, risks, KPIs and traceability. |
+| [`docs/activity-inventory.md`](docs/activity-inventory.md) | Requirements & automation matrix — every activity from both source PDFs classified by trigger → automation level → mechanism. |
 
-Then open the dashboard at `/` (or the live preview), or hit the JSON API at `/api/summary`,
-`/api/tasks`, etc. See [`app/README.md`](app/README.md) for details.
+## Reference spike (not part of the architecture phase)
+
+| Path | What it is |
+| --- | --- |
+| [`app/`](app/README.md) | A zero-dependency Python 3 prototype demonstrating the PLAN → ASSIGN → EXECUTE → MONITOR → VERIFY → RECORD → REPORT → FOLLOW UP cycle. Superseded by the approved architecture; rebuilt properly during implementation phases. |
+
+## How to read
+
+1. Start with **§1–§8** of [`docs/architecture.md`](docs/architecture.md) for the "why and what".
+2. Review **§9–§19** for the technical design (views, data, workflows, security).
+3. Review **§20–§27** for decisions, roadmap, costs, risks, KPIs and the **open questions** that need
+   answers before implementation begins.
