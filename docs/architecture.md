@@ -10,6 +10,16 @@
 | **Source documents** | `Administrative_Officer_Farm_Property_Coordination_Workplan.pdf` · `Administrative_Officer_Job_Description-1.pdf` |
 | **Related** | [`activity-inventory.md`](activity-inventory.md) — requirements & automation traceability matrix |
 
+> **Architecture package** — this document is the master (item 1 · complete system architecture).
+> Companion documents: [`domain-map.md`](domain-map.md) · [`data-model.md`](data-model.md) ·
+> [`role-permission-matrix.md`](role-permission-matrix.md) · [`workflows.md`](workflows.md) ·
+> [`event-catalogue.md`](event-catalogue.md) · [`automation-engines.md`](automation-engines.md) ·
+> [`api-contract.md`](api-contract.md) · [`information-architecture.md`](information-architecture.md) ·
+> [`integrations.md`](integrations.md) · [`security-architecture.md`](security-architecture.md) ·
+> [`offline-sync.md`](offline-sync.md) · [`testing-strategy.md`](testing-strategy.md) ·
+> [`implementation-plan.md`](implementation-plan.md) · [`assumptions.md`](assumptions.md)
+> (PROVEN / INFERRED / DECISION_REQUIRED).
+
 ---
 
 ## Table of contents
@@ -412,6 +422,9 @@ flowchart LR
 
 ## 11. Data architecture
 
+> The canonical, complete ERD and data dictionary are in [`data-model.md`](data-model.md)
+> (items 4–5). This section summarises; where they differ, `data-model.md` wins.
+
 ### 11.1 Conceptual data model
 
 ```mermaid
@@ -455,7 +468,7 @@ erDiagram
 | | title, area, responsible | text | |
 | | priority | enum(High,Med,Low) | |
 | | due_date | date | |
-| | status | enum(Pending,In Progress,Completed,Escalated) | |
+| | status | enum(PENDING, ASSIGNED, IN_PROGRESS, BLOCKED, SUBMITTED, VERIFICATION_REQUIRED, COMPLETED, REJECTED, ESCALATED, CANCELLED) | ten-status model (see [`workflows.md`](workflows.md) §1) |
 | | follow_up_of | FK → TASK | self-reference (control cycle) |
 | | created_at, completed_at, note | timestamp/text | |
 
@@ -591,19 +604,18 @@ and emit events. This maps 1:1 to the layers in §9.
 
 ### 13.1 Task lifecycle (the control cycle core)
 
-```mermaid
-stateDiagram-v2
-    [*] --> Pending
-    Pending --> InProgress : start
-    InProgress --> Completed : verify + sign-off
-    Pending --> Escalated : overdue +2d
-    InProgress --> Escalated : overdue +2d
-    Escalated --> InProgress : re-assigned
-    Completed --> [*]
-```
+The canonical task state machine uses the ten statuses from the master build prompt —
+`PENDING, ASSIGNED, IN_PROGRESS, BLOCKED, SUBMITTED, VERIFICATION_REQUIRED, COMPLETED, REJECTED,
+ESCALATED, CANCELLED` — with enforced transitions (see [`workflows.md`](workflows.md) §1).
 
-- Guards: transition to **Completed** requires a verifier (sign-off/photo) — the workplan's "VERIFY".
-- Overdue detection is automatic; escalation follows the matrix in §15.
+- Guards: transition to **COMPLETED** requires verification where `verification_required` is set — the
+  workplan's "VERIFY" stage.
+- Overdue detection is automatic; escalation follows the configurable ladder (§15 and
+  [`automation-engines.md`](automation-engines.md) §4).
+
+> The state machines below (§13.2–§13.6) are summarised; the canonical, fully-specified versions
+> (with actors, conditions, evidence, approvals, notifications and audit per transition) are in
+> [`workflows.md`](workflows.md).
 
 ### 13.2 Maintenance
 
@@ -906,15 +918,11 @@ stateDiagram-v2
 
 ## 22. Delivery roadmap & phasing
 
-| Phase | Focus | Deliverables | Exit criteria |
-| --- | --- | --- | --- |
-| **0 · Baseline & digitise** (wk 1–2) | One trusted place | Master registers for all 14 areas; calendars; WhatsApp Business number; migration from paper | Registers loaded & reconciled |
-| **1 · Schedule & remind** (wk 3–6) | Stop remembering | Task templates + scheduler; reminder ladder; auto daily summary & Friday report | 100% recurring tasks auto-generated; reports auto-compiled |
-| **2 · Digitise capture** (wk 7–12) | Kill paper forms | WhatsApp/Form intake for requests, incidents, attendance, stock counts, inspections | Capture in system, not paper |
-| **3 · Workflow automation** (mo 4–6) | Automate value chains | Maintenance work orders; procurement approvals; arrears & renewal escalation; rent invoicing & receipts; e-signature | End-to-end flows live |
-| **4 · Analytics & improvement** (mo 6–12) | Self-improving | Dashboards, KPI tracking, predictive alerts (renewals, seasonal buying), mobile-money integration | Management reviews KPIs monthly |
-
-Each phase is a thin vertical slice (P8): a small, valuable, testable increment — not a big-bang cutover.
+The authoritative 10-phase, dependency-ordered plan (Foundation → Core coordination → Property
+management → Rent → Maintenance → Farm → Stock/Assets/Procurement → Incidents/Compliance/Records →
+Reporting → Integrations) is in [`implementation-plan.md`](implementation-plan.md), including the
+dependency graph (§72), the definition of done (§79), and the `DECISION_REQUIRED` gates. Each phase
+is a thin vertical slice — a small, valuable, testable increment, not a big-bang cutover.
 
 ---
 
@@ -931,7 +939,7 @@ Each phase is a thin vertical slice (P8): a small, valuable, testable increment 
 | Ongoing support | minimal | retained IT (part-time) | |
 
 **Position:** the start stack is effectively **free-to-tens-of-dollars per month**; scale-up adds a
-VPS and modest support time. The main investment is the officer's time during Phase 0.
+VPS and modest support time. The main investment is the officer's time during Phase 1 (Foundation).
 
 ---
 
@@ -974,29 +982,24 @@ VPS and modest support time. The main investment is the officer's time during Ph
 
 | FR | Workplan/JD source | Primary component(s) | Phase |
 | --- | --- | --- | --- |
-| FR-01..03 | JD Tenant Placement · T6 | Tenant & lease service, capture adapters | 2–3 |
+| FR-01..03 | JD Tenant Placement · T6 | Tenant & lease service, capture adapters | 3 |
 | FR-04..06 | JD Lease Admin · T6 · T12 | Tenant & lease service, document store | 3 |
-| FR-07..11 | JD Rent · T13 | Rent & finance service, notification | 1,3 |
-| FR-12..16 | JD Maint · T5 · T8 · T12 | Maintenance service, scheduler | 1,3 |
-| FR-17..20 | T1–T4 | Farm ops service, scheduler, checklists | 1–2 |
-| FR-21..24 | T9–T11 | Stock/asset/procurement services | 2–3 |
-| FR-25..27 | T7 · T14 · JD Legal | Incident & service desk, compliance calendar | 2–3 |
-| FR-28..32 | Workplan · T12 · T13 | Scheduler, task register, records, reporting | 1–2 |
+| FR-07..11 | JD Rent · T13 | Rent & finance service, notification | 4 |
+| FR-12..16 | JD Maint · T5 · T8 · T12 | Maintenance service, scheduler | 5 |
+| FR-17..20 | T1–T4 | Farm ops service, scheduler, checklists | 6 |
+| FR-21..24 | T9–T11 | Stock/asset/procurement services | 7 |
+| FR-25..27 | T7 · T14 · JD Legal | Incident & service desk, compliance calendar | 8 (service desk: 5) |
+| FR-28..32 | Workplan · T12 · T13 | Scheduler, task register, records, reporting | 2, 9 |
 
 ---
 
 ## 27. Open questions & decisions needed
 
-| # | Question | Needed for | Owner |
-| --- | --- | --- | --- |
-| Q-01 | Preferred interface/notice language (Sesotho/English/both)? | NFR-12, templates | Officer |
-| Q-02 | Is a WhatsApp Business number available for the organisation? | ADR-002 | Officer |
-| Q-03 | Which rent payment method(s) — bank, M-Pesa/EcoCash? | ADR-006 | HoSS |
-| Q-04 | Procurement approval thresholds by value (who approves what)? | FR-24 | HoSS |
-| Q-05 | Where do current tenant/lease/stock/asset records live, and in what format? | §11.5 migration | Officer |
-| Q-06 | Confirm statutory retention periods for tenant/legal/financial records | §11.4 | Legal |
-| Q-07 | Budget envelope and approval process for the recurring tool costs | §23 | Management |
-| Q-08 | Is the Property Caretakers Supervisor role currently filled? | RBAC, rota | Officer |
+The canonical register of open decisions is [`assumptions.md`](assumptions.md) §3
+(`DECISION_REQUIRED`): procurement approval thresholds · statutory retention periods · payment
+integrations · WhatsApp provider · e-signature provider & legal validity · compliance obligations ·
+interface language · tool-cost budget. Each is isolated as configuration so the build proceeds
+without silently guessing.
 
 ---
 
@@ -1019,5 +1022,6 @@ VPS and modest support time. The main investment is the officer's time during Ph
 
 ---
 
-*This architecture is a living document. Approve it (with answers to §27), and only then proceed to
-implementation — starting with Phase 0.*
+*This architecture is a living document. Approve it (with answers to the `DECISION_REQUIRED` items in
+[`assumptions.md`](assumptions.md) §3), then proceed per [`implementation-plan.md`](implementation-plan.md),
+starting with Phase 1 (Foundation).*
